@@ -14,8 +14,13 @@ from enum import Enum
 from pathlib import Path
 import re
 
-from .code_tools import CodeTools, SearchResult, FileInfo
-from .mcp_router import MCPFilesystem
+# Support running as a module or as a script by allowing both relative and absolute imports.
+try:
+    from .code_tools import CodeTools, SearchResult, FileInfo
+    from .mcp_router import MCPFilesystem
+except ImportError:  # pragma: no cover - fallback for non-package execution
+    from code_tools import CodeTools, SearchResult, FileInfo
+    from mcp_router import MCPFilesystem
 
 
 class TaskStatus(Enum):

@@ -2,6 +2,7 @@
 import sys
 import os
 import yaml
+import argparse
 
 # Add the 'src' directory to the Python path to allow importing project modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -18,6 +19,10 @@ def main():
     Runs the quantization pipeline for all models defined in models.yaml,
     or for a specific model if provided as a command-line argument.
     """
+    parser = argparse.ArgumentParser(description="Run the quantization pipeline.")
+    parser.add_argument("model", nargs="?", help="Specific model name to quantize. Defaults to all models in config.")
+    args = parser.parse_args()
+
     # Construct the path to the config file
     config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'models.yaml')
     try:
@@ -30,9 +35,8 @@ def main():
     pipeline = QuantizationPipeline()
     models_to_quantize = []
 
-    if len(sys.argv) > 1:
-        # User specified a model to quantize
-        model_name = sys.argv[1]
+    if args.model:
+        model_name = args.model
         print(f"Quantizing specific model: {model_name}...")
         # Verify the model exists in the config
         found = False

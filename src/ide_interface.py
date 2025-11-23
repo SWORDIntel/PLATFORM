@@ -26,22 +26,40 @@ from rich.text import Text
 from rich.panel import Panel
 from rich.table import Table as RichTable
 
-from .self_coder import SelfCodingAgent, TaskStatus, AgentAction
-from .codebreaker import (
-    ascii_preview,
-    compute_ai_power,
-    decode_base64_payload,
-    format_ai_devices,
-    hex_preview,
-    load_ai_devices,
-    benchmark_simon_speck,
-    guess_encryption_profile,
-    optimize_for_devices,
-    select_devices,
-    DEFAULT_HARDWARE_CONFIG,
-    DEFAULT_PAYLOAD,
-    DEFAULT_SUPERCOP_PATH,
-)
+try:
+    from .self_coder import SelfCodingAgent, TaskStatus, AgentAction
+    from .codebreaker import (
+        ascii_preview,
+        compute_ai_power,
+        decode_base64_payload,
+        format_ai_devices,
+        hex_preview,
+        load_ai_devices,
+        benchmark_simon_speck,
+        guess_encryption_profile,
+        optimize_for_devices,
+        select_devices,
+        DEFAULT_HARDWARE_CONFIG,
+        DEFAULT_PAYLOAD,
+        DEFAULT_SUPERCOP_PATH,
+    )
+except ImportError:  # pragma: no cover - fallback when not executed as package
+    from self_coder import SelfCodingAgent, TaskStatus, AgentAction
+    from codebreaker import (
+        ascii_preview,
+        compute_ai_power,
+        decode_base64_payload,
+        format_ai_devices,
+        hex_preview,
+        load_ai_devices,
+        benchmark_simon_speck,
+        guess_encryption_profile,
+        optimize_for_devices,
+        select_devices,
+        DEFAULT_HARDWARE_CONFIG,
+        DEFAULT_PAYLOAD,
+        DEFAULT_SUPERCOP_PATH,
+    )
 
 
 class StatusBar(Static):
@@ -758,7 +776,10 @@ class IDEInterface(App):
         self.hardware_config_path = Path(DEFAULT_HARDWARE_CONFIG)
 
         # Session management
-        from .session_manager import SessionManager
+        try:
+            from .session_manager import SessionManager
+        except ImportError:  # pragma: no cover
+            from session_manager import SessionManager
         self.session_manager = SessionManager()
         self.current_session_id = None
 
@@ -1210,7 +1231,10 @@ To enable direct prompting, connect to router at {self.agent.router_url}
             terminal.write(response)
 
             # Add to conversation history
-            from .self_coder import ConversationMessage
+            try:
+                from .self_coder import ConversationMessage
+            except ImportError:  # pragma: no cover
+                from self_coder import ConversationMessage
             self.agent.conversation.append(
                 ConversationMessage(role="user", content=prompt)
             )

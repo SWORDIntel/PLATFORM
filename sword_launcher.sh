@@ -221,8 +221,45 @@ do_download_models() {
     if [ ! -s "$urls_file" ]; then
         warn "No model URLs were found. Check 'config/models.yaml'."
     else
+        # Attempt to prefetch checksum files alongside URLs (best effort).
+        info "Attempting to fetch .sha256 checksum files for listed models (best effort)..."
+        while IFS= read -r url; do
+            fname=$(basename "$url")
+            checksum_url="${url}.sha256"
+            checksum_dest="${model_dir}/${fname}.sha256"
+            if command -v aria2c &> /dev/null; then
+                aria2c -x 4 -s 4 -k 1M -o "$(basename "$checksum_dest")" -d "$model_dir" "$checksum_url" >/dev/null 2>&1 || true
+            elif command -v curl &> /dev/null; then
+                curl -L --fail --silent "$checksum_url" -o "$checksum_dest" 2>/dev/null || true
+            else
+                wget -q -O "$checksum_dest" "$checksum_url" 2>/dev/null || true
+            fi
+            # Clean up empty/failed downloads
+            if [ -f "$checksum_dest" ] && [ ! -s "$checksum_dest" ]; then
+                rm -f "$checksum_dest"
+            fi
+        done < "$urls_file"
+
         info "Starting download with aria2c... (See aria-log.txt for details)"
         aria2c --input-file="$urls_file" --dir="$model_dir" --continue=true --max-concurrent-downloads=5 --max-connection-per-server=8 --split=8 --min-split-size=1M --log="aria-log.txt" --log-level=warn --summary-interval=10 --human-readable=true --auto-file-renaming=false -x 16 -s 16 -k 1M
+
+        # Optional checksum verification: if a matching .sha256 file exists alongside a model, verify it.
+        info "Verifying checksums for downloaded models when *.sha256 present..."
+        while IFS= read -r line; do
+            url=$(echo "$line" | awk '{print $1}')
+            fname=$(basename "$url")
+            checksum_file="${model_dir}/${fname}.sha256"
+            target_file="${model_dir}/${fname}"
+            if [ -f "$checksum_file" ] && [ -f "$target_file" ]; then
+                expected=$(awk '{print $1}' "$checksum_file")
+                actual=$(sha256sum "$target_file" | awk '{print $1}')
+                if [ "$expected" != "$actual" ]; then
+                    warn "Checksum mismatch for $fname (expected $expected, got $actual)"
+                else
+                    info "Checksum OK for $fname"
+                fi
+            fi
+        done < "$urls_file"
     fi
     
     rm -f "$urls_file"

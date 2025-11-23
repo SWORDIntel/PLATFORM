@@ -11,6 +11,7 @@ cxx_bin="g++-12"
 llvm_version="16.0.6"
 llvm_tarball=""
 llvm_url=""
+llvm_prebuilt_release="v2025.2.0"  # awakecoding/llvm-prebuilt release tag
 
 install_prereqs() {
   if command -v apt-get &>/dev/null; then
@@ -72,10 +73,10 @@ install_prebuilt_llvm16() {
     arch_slug="aarch64"
   fi
 
-  # Try multiple prebuilt variants (newest first)
+  # Try multiple prebuilt variants (newest first) from awakecoding/llvm-prebuilt
   local candidates=(
-    "clang+llvm-${llvm_version}-${arch_slug}-linux-gnu-ubuntu-22.04.tar.xz"
-    "clang+llvm-${llvm_version}-${arch_slug}-linux-gnu-ubuntu-20.04.tar.xz"
+    "clang+llvm-${llvm_version}-${arch_slug}-ubuntu-22.04.tar.xz"
+    "clang+llvm-${llvm_version}-${arch_slug}-ubuntu-24.04.tar.xz"
   )
 
   local dest_dir="${workspace}/llvm-16-prebuilt"
@@ -88,24 +89,55 @@ install_prebuilt_llvm16() {
   mkdir -p "${workspace}"
   for candidate in "${candidates[@]}"; do
     llvm_tarball="${LLVM_TARBALL_OVERRIDE:-$candidate}"
-    llvm_url="${LLVM_URL_OVERRIDE:-https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_version}/${llvm_tarball}}"
+    # Try awakecoding prebuilt release first, then legacy releases site
+    llvm_url="${LLVM_URL_OVERRIDE:-https://github.com/awakecoding/llvm-prebuilt/releases/download/${llvm_prebuilt_release}/${llvm_tarball}}"
+    local fallback_url="https://releases.llvm.org/${llvm_version}/${llvm_tarball}"
+    local checksum_url="https://github.com/awakecoding/llvm-prebuilt/releases/download/${llvm_prebuilt_release}/checksums"
 
     echo "Fetching prebuilt LLVM 16: ${llvm_tarball} ..."
     local target="${workspace}/${llvm_tarball}"
     rm -f "${target}"
-    if command -v curl &>/dev/null; then
-      curl -L --fail "${llvm_url}" -o "${target}" || continue
+    if command -v aria2c &>/dev/null; then
+      aria2c -x 8 -s 8 -k 1M -o "$(basename "${target}")" -d "${workspace}" "${llvm_url}" || \
+      aria2c -x 8 -s 8 -k 1M -o "$(basename "${target}")" -d "${workspace}" "${fallback_url}" || continue
+    elif command -v curl &>/dev/null; then
+      curl -L --fail --retry 3 --retry-delay 2 "${llvm_url}" -o "${target}" || curl -L --fail --retry 3 --retry-delay 2 "${fallback_url}" -o "${target}" || continue
     else
-      wget -O "${target}" "${llvm_url}" || continue
+      wget --tries=3 --wait=2 -O "${target}" "${llvm_url}" || wget --tries=3 --wait=2 -O "${target}" "${fallback_url}" || continue
     fi
 
-    # Quick sanity check on file size (>10MB)
+    # Quick sanity check on file size (>50MB)
     local size
     size=$(stat -c%s "${target}" 2>/dev/null || echo 0)
-    if [[ "${size}" -lt 10000000 ]]; then
+    if [[ "${size}" -lt 50000000 ]]; then
       echo "Downloaded tarball looks too small (${size} bytes); trying next candidate..."
       rm -f "${target}"
       continue
+    fi
+
+    # Download checksums file and verify sha256 if available
+    local checksum_file="${workspace}/llvm-prebuilt-checksums"
+    rm -f "${checksum_file}"
+    if command -v aria2c &>/dev/null; then
+      aria2c -x 4 -s 4 -k 1M -o "$(basename "${checksum_file}")" -d "${workspace}" "${checksum_url}" || true
+    elif command -v curl &>/dev/null; then
+      curl -L --fail --retry 3 --retry-delay 2 "${checksum_url}" -o "${checksum_file}" || true
+    else
+      wget --tries=3 --wait=2 -O "${checksum_file}" "${checksum_url}" || true
+    fi
+
+    if [[ -f "${checksum_file}" ]]; then
+      local expected
+      expected=$(grep "${llvm_tarball}" "${checksum_file}" | awk '{print $1}' || true)
+      if [[ -n "${expected}" ]]; then
+        local actual
+        actual=$(sha256sum "${target}" | awk '{print $1}')
+        if [[ "${expected}" != "${actual}" ]]; then
+          echo "Checksum mismatch for ${llvm_tarball} (expected ${expected}, got ${actual}); trying next candidate..."
+          rm -f "${target}"
+          continue
+        fi
+      fi
     fi
 
     mkdir -p "${dest_dir}"
