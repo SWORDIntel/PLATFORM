@@ -15,7 +15,7 @@ from textual.containers import Container, Horizontal, Vertical, VerticalScroll, 
 from textual.widgets import (
     Header, Footer, Static, Button, Input, TextArea,
     DirectoryTree, Label, Tree, TabbedContent,
-    TabPane, DataTable, RichLog, Placeholder
+    TabPane, DataTable, RichLog, Placeholder, ProgressBar
 )
 from textual.binding import Binding
 from textual.reactive import reactive
@@ -27,6 +27,21 @@ from rich.panel import Panel
 from rich.table import Table as RichTable
 
 from .self_coder import SelfCodingAgent, TaskStatus, AgentAction
+from .codebreaker import (
+    ascii_preview,
+    compute_ai_power,
+    decode_base64_payload,
+    format_ai_devices,
+    hex_preview,
+    load_ai_devices,
+    benchmark_simon_speck,
+    guess_encryption_profile,
+    optimize_for_devices,
+    select_devices,
+    DEFAULT_HARDWARE_CONFIG,
+    DEFAULT_PAYLOAD,
+    DEFAULT_SUPERCOP_PATH,
+)
 
 
 class StatusBar(Static):
@@ -343,6 +358,7 @@ class CommandPalette(ModalScreen):
         ("Show Actions", "show_actions", "F3"),
         ("Agent Status", "agent_status", "F4"),
         ("Git Status", "git_status", "F5"),
+        ("Codebreaker", "codebreaker", "F6"),
         ("Help", "help", "F1"),
         ("Quit", "quit", "Ctrl+Q"),
     ]
@@ -379,6 +395,141 @@ class CommandPalette(ModalScreen):
         if 0 <= row_index < len(self.COMMANDS):
             _, action, _ = self.COMMANDS[row_index]
             self.dismiss(action)
+
+
+class CodebreakerModal(ModalScreen):
+    """Modal that runs codebreaker analysis with progress feedback."""
+
+    CSS = """
+    CodebreakerModal {
+        align: center middle;
+    }
+
+    #codebreaker-dialog {
+        width: 90;
+        height: 30;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+
+    #codebreaker-progress {
+        margin: 1 0;
+    }
+    """
+
+    def __init__(
+        self,
+        payload: str,
+        hardware_path: Path,
+        selected_devices: list[str] | None = None,
+        benchmark_crypto: bool = False,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.payload = payload or DEFAULT_PAYLOAD
+        self.hardware_path = hardware_path
+        self.selected_devices = selected_devices or []
+        self.benchmark_crypto = benchmark_crypto
+
+    def compose(self) -> ComposeResult:
+        with Container(id="codebreaker-dialog"):
+            yield Label("🧨 Codebreaker Analysis", classes="dialog-title")
+            yield ProgressBar(total=100, id="codebreaker-progress")
+            yield RichLog(id="codebreaker-log", highlight=True, markup=True)
+            with Horizontal():
+                yield Button("Close", variant="primary", id="close-codebreaker")
+
+    async def on_mount(self):
+        self.call_later(self.run_analysis)
+
+    async def run_analysis(self):
+        progress = self.query_one("#codebreaker-progress", ProgressBar)
+        log = self.query_one("#codebreaker-log", RichLog)
+
+        def update_progress(value: int, message: str, style: str = "cyan"):
+            progress.update(value=min(value, 100))
+            log.write(f"[{style}]{message}[/]")
+
+        update_progress(5, "Initializing codebreaker stack…")
+        await asyncio.sleep(0.05)
+
+        decoded, warnings = decode_base64_payload(self.payload)
+        enc_profile, sentence_like = guess_encryption_profile(decoded)
+        update_progress(30, f"Decoded payload: {len(decoded)} bytes (input {len(self.payload)} chars)")
+        for warning in warnings:
+            log.write(f"[yellow]Warning:[/] {warning}")
+
+        if decoded:
+            update_progress(45, "Generating previews…")
+            log.write(f"[green]Hex:[/] {hex_preview(decoded)}")
+            log.write(f"[green]ASCII:[/] {ascii_preview(decoded)}")
+        else:
+            log.write("[red]No decoded bytes available.[/]")
+
+        update_progress(55, "Loading AI device inventory…")
+        accelerators = load_ai_devices(self.hardware_path)
+        if not accelerators:
+            log.write(f"[red]No accelerators found at {self.hardware_path}.[/]")
+            progress.update(value=100)
+            return
+
+        normalized_keys = [key.strip() for key in self.selected_devices if key and key.strip()]
+        use_all_devices = any(k.lower() in {"all", "*"} for k in normalized_keys)
+        scoped_accelerators, missing = select_devices(
+            accelerators, normalized_keys if not use_all_devices else []
+        )
+        selection_label = ", ".join(normalized_keys) if normalized_keys else "all"
+        log.write(f"[cyan]Selection:[/] {selection_label}")
+        if missing:
+            log.write(f"[yellow]Missing requested devices:[/] {', '.join(missing)}")
+
+        if not scoped_accelerators:
+            log.write("[red]No accelerators match the provided selection.[/]")
+            progress.update(value=100)
+            return
+
+        power = compute_ai_power(scoped_accelerators)
+        if power.get("total_tops"):
+            log.write(
+                f"[magenta]Aggregate:[/] {power['total_tops']:.1f} TOPS across {power['device_count']} entries"
+            )
+        if power.get("strongest_device"):
+            log.write(f"[magenta]Lead device:[/] {power['strongest_device']}")
+
+        update_progress(70, "Enumerating accelerators…")
+        for line in format_ai_devices(scoped_accelerators):
+            log.write(line)
+
+        if self.benchmark_crypto:
+            update_progress(85, "Running Simon/Speck SUPERCOP benchmark…")
+            bench_log, bench_warn = await asyncio.to_thread(
+                benchmark_simon_speck, scoped_accelerators, DEFAULT_SUPERCOP_PATH
+            )
+            for entry in bench_log:
+                log.write(f"[cyan]- {entry}[/]")
+            for warn in bench_warn:
+                log.write(f"[yellow]Warning:[/] {warn}")
+        else:
+            update_progress(80, "Optimizing selection…")
+        for line in optimize_for_devices(scoped_accelerators):
+            log.write(f"[cyan]- {line}[/]")
+
+        update_progress(95, "Final classification…")
+        sentence_flag = "yes" if sentence_like else "no"
+        tops_msg = (
+            f"{power['total_tops']:.1f} TOPS engaged" if power.get("total_tops") else "TOPS unavailable"
+        )
+        log.write(f"[green]Encryption type guess:[/] {enc_profile}")
+        log.write(f"[green]Sentence-like payload:[/] {sentence_flag}")
+        log.write(f"[green]TOPS utilization estimate:[/] {tops_msg}")
+
+        update_progress(100, "Codebreaker complete — all AI power accounted for.", style="green")
+        log.write("[dim]Press Close or Esc to return.[/dim]")
+
+    @on(Button.Pressed, "#close-codebreaker")
+    def close_modal(self):
+        self.dismiss()
 
 
 class TaskPanel(ScrollableContainer):
@@ -595,12 +746,14 @@ class IDEInterface(App):
         Binding("f3", "focus_actions", "Actions"),
         Binding("f4", "agent_status", "Status"),
         Binding("f5", "git_status", "Git"),
+        Binding("f6", "codebreaker", "Codebreaker"),
     ]
 
     def __init__(self, workspace_root: str = None, **kwargs):
         super().__init__(**kwargs)
         self.workspace_root = workspace_root or os.getcwd()
         self.agent = SelfCodingAgent(self.workspace_root)
+        self.hardware_config_path = Path(DEFAULT_HARDWARE_CONFIG)
 
         # Session management
         from .session_manager import SessionManager
@@ -716,6 +869,25 @@ class IDEInterface(App):
         elif command.lower() == "save":
             self.save_current_session()
             return
+        elif command.lower().startswith("codebreaker"):
+            payload_override = None
+            device_keys: list[str] = []
+            benchmark_crypto = False
+
+            parts = command.split(" ", 1)
+            if len(parts) > 1:
+                for token in parts[1].split():
+                    if token.lower().startswith("payload="):
+                        payload_override = token.split("=", 1)[1].strip() or None
+                    elif token.lower().startswith("devices="):
+                        device_keys = [k.strip() for k in token.split("=", 1)[1].split(",") if k.strip()]
+                    elif token.lower() in {"bench", "benchmark", "supcop", "supercop"}:
+                        benchmark_crypto = True
+                    elif payload_override is None:
+                        payload_override = token.strip()
+
+            self.launch_codebreaker(payload_override, device_keys or None, benchmark_crypto)
+            return
         elif command.lower().startswith("prompt:") or command.lower().startswith("llm:"):
             # Direct LLM prompting
             prompt = command.split(":", 1)[1].strip()
@@ -769,6 +941,34 @@ class IDEInterface(App):
         terminal.write(f"  Total tasks: {len(self.agent.tasks)}")
         terminal.write(f"  Actions taken: {len(self.agent.action_history)}")
         terminal.write(f"╚═══════════════════╝", style="bold blue")
+
+    def launch_codebreaker(
+        self,
+        payload: str | None = None,
+        device_keys: list[str] | None = None,
+        benchmark_crypto: bool = False,
+    ):
+        """Open the codebreaker modal with optional payload, device selection, and SUPERCOP benchmarking."""
+        terminal = self.query_one("#terminal-panel", TerminalPanel)
+        source = "custom payload" if payload else "default payload"
+        selection = ", ".join(device_keys) if device_keys else "all devices"
+        bench_label = "with SUPERCOP" if benchmark_crypto else "no benchmark"
+        terminal.write(
+            f"⚡ Launching codebreaker ({source}; selection: {selection}; {bench_label})…",
+            style="magenta",
+        )
+        self.push_screen(
+            CodebreakerModal(
+                payload or DEFAULT_PAYLOAD,
+                self.hardware_config_path,
+                device_keys or [],
+                benchmark_crypto,
+            )
+        )
+
+    def action_codebreaker(self):
+        """Trigger codebreaker analysis (F6)."""
+        self.launch_codebreaker()
 
     def open_file_by_path(self, file_path: str):
         """Open file by path."""
@@ -853,6 +1053,7 @@ class IDEInterface(App):
         terminal.write("  F3         - Focus actions")
         terminal.write("  F4         - Agent status")
         terminal.write("  F5         - Git status")
+        terminal.write("  F6         - Codebreaker hardware check")
         terminal.write("\n╔═══ Commands ═══╗", style="bold blue")
         terminal.write("  help         - Show this help")
         terminal.write("  status       - Show agent status")
@@ -861,6 +1062,7 @@ class IDEInterface(App):
         terminal.write("  sessions     - List saved sessions")
         terminal.write("  save         - Save current session")
         terminal.write("  resume ID    - Resume session by ID")
+        terminal.write("  codebreaker [PAYLOAD] [devices=a,b] - Decode payload + optimize selection")
         terminal.write("  prompt: TEXT - Direct LLM prompting")
         terminal.write("  llm: TEXT    - Direct LLM prompting (alias)")
         terminal.write("\n╔═══ Coding Tasks ═══╗", style="bold blue")
