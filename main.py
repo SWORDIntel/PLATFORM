@@ -7,6 +7,8 @@ Usage:
     python main.py --benchmark        # Run benchmarks
     python main.py --mcp-test         # Test MCP servers
     python main.py --storage          # Show storage estimates
+    python main.py --ide              # Launch IDE interface
+    python main.py --self-code        # Start interactive self-coding session
 """
 
 import sys
@@ -22,6 +24,9 @@ def main():
     parser.add_argument('--benchmark', action='store_true', help='Run benchmarks')
     parser.add_argument('--mcp-test', action='store_true', help='Test MCP servers')
     parser.add_argument('--storage', action='store_true', help='Show storage estimates')
+    parser.add_argument('--ide', action='store_true', help='Launch IDE interface')
+    parser.add_argument('--self-code', action='store_true', help='Start self-coding interactive session')
+    parser.add_argument('--workspace', default=os.getcwd(), help='Workspace root directory')
     parser.add_argument('--host', default='0.0.0.0', help='Router host')
     parser.add_argument('--port', type=int, default=8000, help='Router port')
     args = parser.parse_args()
@@ -51,6 +56,28 @@ def main():
         print("Per-model breakdown:")
         for model, info in storage['models'].items():
             print(f"  {model:<35} {info['fp32_gb']:>6.1f} GB -> {info['quantized_gb']:>5.2f} GB ({info['compression_ratio']:.1f}x)")
+        return
+
+    if args.ide:
+        print("=" * 60)
+        print("SWORD Self-Coding IDE")
+        print("=" * 60)
+        print(f"Workspace: {args.workspace}")
+        print("Launching IDE interface...")
+        print()
+        from ide_interface import run_ide
+        run_ide(args.workspace)
+        return
+
+    if args.self_code:
+        print("=" * 60)
+        print("SWORD Self-Coding Agent - Interactive Session")
+        print("=" * 60)
+        print(f"Workspace: {args.workspace}")
+        print()
+        from self_coder import SelfCodingAgent
+        agent = SelfCodingAgent(args.workspace)
+        agent.interactive_session()
         return
 
     # Start router

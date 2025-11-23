@@ -29,6 +29,18 @@ python-dotenv>=1.0
 rich>=13.7.0               # Pretty console output
 typer>=0.9.0               # CLI framework
 
+# IDE / TUI Interface
+textual>=0.47.0            # Modern TUI framework
+textual-dev>=1.2.0         # Textual development tools
+pygments>=2.17.0           # Syntax highlighting
+prompt-toolkit>=3.0.43     # Advanced terminal UI
+
+# Self-Coding Agent
+anthropic>=0.18.0          # Claude API client (optional, for cloud fallback)
+litellm>=1.17.0            # LLM abstraction layer
+tiktoken>=0.5.2            # Token counting
+zstandard>=0.21.0          # Session compression
+
 # Optional: Quantization (uncomment when ready)
 # auto-round>=0.3.0
 # neural-compressor>=2.4.0

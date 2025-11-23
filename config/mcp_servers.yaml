@@ -1,0 +1,253 @@
+# MCP Server Configuration
+# Configuration for Model Context Protocol servers
+
+servers:
+  # Filesystem MCP Server
+  # Provides local file system access with security
+  filesystem:
+    enabled: true
+    command: ["python", "-m", "src.mcp_router"]
+    mode: "local"
+    allowed_paths:
+      - "/home/user/PLATFORM"
+      - "/home/user/PLATFORM/src"
+      - "/home/user/PLATFORM/scripts"
+      - "/home/user/PLATFORM/config"
+    tools:
+      - name: "read_file"
+        description: "Read file contents from allowed paths"
+      - name: "write_file"
+        description: "Write or create files in allowed paths"
+      - name: "list_directory"
+        description: "List directory contents"
+      - name: "search_files"
+        description: "Search for patterns in files"
+
+  # Context7 MCP Server
+  # Library and documentation context provider
+  context7:
+    enabled: true
+    command: ["npx", "-y", "@modelcontextprotocol/server-context7"]
+    mode: "local"
+    env:
+      CONTEXT7_CACHE_DIR: "/tmp/context7_cache"
+    tools:
+      - name: "get_documentation"
+        description: "Retrieve documentation for libraries and APIs"
+      - name: "search_docs"
+        description: "Search documentation by keyword"
+      - name: "get_examples"
+        description: "Get code examples from documentation"
+    # Context sources
+    sources:
+      - type: "python"
+        packages:
+          - "torch"
+          - "transformers"
+          - "fastapi"
+          - "textual"
+          - "openvino"
+      - type: "web"
+        urls:
+          - "https://docs.python.org/3/"
+          - "https://pytorch.org/docs/"
+          - "https://huggingface.co/docs/"
+
+  # MemLayer MCP Server
+  # Persistent memory and knowledge graph
+  memlayer:
+    enabled: true
+    command: ["npx", "-y", "@modelcontextprotocol/server-memory"]
+    mode: "local"
+    env:
+      MEMORY_DB_PATH: "/tmp/memlayer.db"
+    tools:
+      - name: "store_memory"
+        description: "Store information in persistent memory"
+      - name: "recall_memory"
+        description: "Retrieve stored memories by key or query"
+      - name: "search_memory"
+        description: "Search memory by semantic similarity"
+      - name: "create_entity"
+        description: "Create entity in knowledge graph"
+      - name: "relate_entities"
+        description: "Create relationship between entities"
+      - name: "query_graph"
+        description: "Query knowledge graph"
+    memory_config:
+      max_entries: 10000
+      embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+      similarity_threshold: 0.7
+
+  # Heretic MCP Server (formerly "Sequoia Heretic")
+  # Uncensored reasoning and alternative analysis
+  # ⚠️ MAXIMUM PERMISSIVENESS MODE ⚠️
+  heretic:
+    enabled: true
+    command: ["python", "-m", "src.heretic_server"]
+    mode: "local"
+    description: "Uncensored analytical reasoning for security and intelligence tasks"
+
+    # MAXIMUM PERMISSIVENESS CONFIGURATION
+    permissiveness: "MAXIMUM"
+    content_filtering: false
+    safety_checks: false
+    restricted_topics: []  # NO RESTRICTIONS
+    censorship: false
+
+    # Full unrestricted capabilities
+    capabilities:
+      - "Complete vulnerability analysis"
+      - "Full exploit development"
+      - "Unrestricted reverse engineering"
+      - "Offensive security operations"
+      - "Tactical planning without constraints"
+      - "Social engineering analysis"
+      - "Cryptographic attacks"
+      - "Malware development and analysis"
+      - "Physical security assessments"
+      - "ZERO content filtering"
+
+    tools:
+      - name: "analyze_uncensored"
+        description: "UNRESTRICTED analysis - NO content filtering, NO safety checks"
+        permissiveness: "MAXIMUM"
+        depth_options: ["shallow", "standard", "comprehensive", "extreme"]
+
+      - name: "threat_model"
+        description: "Complete threat models with ALL attack vectors"
+        include_exploits: true
+        include_evasion: true
+
+      - name: "alternative_reasoning"
+        description: "Explore ALL perspectives without restriction"
+        challenge_ethics: true
+        challenge_legality: true  # For research/CTF only
+
+      - name: "security_analysis"
+        description: "FULL offensive security analysis with working exploits"
+        include_exploits: true
+        include_payloads: true
+        include_evasion: true
+        include_c2: true
+
+    expert_pool:
+      - "WizardLM-13B-Uncensored"
+      - "WizardCoder-Python-34B-V1.0"
+      - "CodeLlama-70B-Instruct-hf"
+
+    routing:
+      layer: 7  # DSMIL Layer 7 (LLMs & Generative AI)
+      hardware: "iGPU"  # Intel Arc iGPU
+      quantization: "INT4"  # Aggressive quantization for large models
+
+    # Authorization and disclaimer
+    authorization:
+      required: true
+      purposes:
+        - "Military and intelligence operations"
+        - "Offensive security and red teaming"
+        - "Penetration testing engagements"
+        - "Security research and education"
+        - "CTF competitions and training"
+        - "Reverse engineering projects"
+        - "Malware analysis"
+        - "Defensive security hardening"
+
+    disclaimer: |
+      ⚠️ MAXIMUM PERMISSIVENESS MODE - AUTHORIZED USE ONLY ⚠️
+
+      This server provides COMPLETE, UNRESTRICTED analysis for:
+      - Security professionals
+      - Military/intelligence personnel
+      - Authorized penetration testers
+      - Security researchers
+      - CTF participants
+
+      NO content filtering. NO safety checks. NO restrictions.
+      ALL attack vectors, exploits, and tactics provided in full detail.
+
+      User is responsible for legal and ethical use.
+
+  # Sequential Thinking MCP Server
+  # Multi-step reasoning and planning
+  sequentialthinking:
+    enabled: true
+    command: ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+    mode: "local"
+    tools:
+      - name: "plan_steps"
+        description: "Break down complex task into steps"
+      - name: "execute_step"
+        description: "Execute individual step with reasoning"
+      - name: "validate_plan"
+        description: "Validate plan completeness and coherence"
+    config:
+      max_depth: 5
+      reasoning_model: "deepseek-r1-distill-qwen-7b"
+
+  # Fetch MCP Server
+  # Web content retrieval
+  fetch:
+    enabled: true
+    command: ["npx", "-y", "@modelcontextprotocol/server-fetch"]
+    mode: "local"
+    tools:
+      - name: "fetch_url"
+        description: "Fetch content from URL"
+      - name: "fetch_github"
+        description: "Fetch from GitHub repository"
+    config:
+      user_agent: "SWORD-Coder-Agent/1.0"
+      timeout: 30
+
+# Global MCP settings
+settings:
+  # Communication protocol
+  protocol: "stdio"  # stdio, http, or websocket
+
+  # Security
+  sandbox: true
+  validate_paths: true
+  max_file_size_mb: 100
+
+  # Performance
+  cache_enabled: true
+  cache_ttl_seconds: 3600
+
+  # Logging
+  log_level: "INFO"
+  log_file: "/tmp/mcp_servers.log"
+
+# Integration with self-coding agent
+agent_integration:
+  # Which MCP servers to use by default
+  default_servers:
+    - "filesystem"
+    - "context7"
+    - "memlayer"
+    - "sequentialthinking"
+
+  # Servers for specific task types
+  task_routing:
+    code_generation:
+      - "context7"
+      - "filesystem"
+    security_analysis:
+      - "heretic"
+      - "filesystem"
+    research:
+      - "fetch"
+      - "context7"
+      - "memlayer"
+    planning:
+      - "sequentialthinking"
+      - "memlayer"
+
+  # Auto-store important information in memlayer
+  auto_memory:
+    enabled: true
+    store_on:
+      - "task_completion"
+      - "error_encountered"
+      - "new_pattern_discovered"

@@ -155,9 +155,63 @@ do_run() {
         error "Virtual environment not found. Please run ./scripts/setup.sh first."
     fi
     source venv/bin/activate
-    
+
     info "Starting application... Press Ctrl+C to stop."
     python3 main.py
+}
+
+# Action: Launch IDE
+do_ide() {
+    print_header "Launching Self-Coding IDE"
+    if [ ! -d "venv" ]; then
+        error "Virtual environment not found. Please run ./scripts/setup.sh first."
+    fi
+    source venv/bin/activate
+
+    # Ask for workspace path
+    local workspace
+    workspace=$(dialog --stdout --inputbox "Enter workspace path (default: current directory):" 8 60 "$PWD")
+    if [ -z "$workspace" ]; then
+        workspace="$PWD"
+    fi
+
+    info "Starting IDE with workspace: $workspace"
+    info "Press Ctrl+Q to exit the IDE"
+    python3 main.py --ide --workspace "$workspace"
+}
+
+# Action: Self-Coding Session
+do_selfcode() {
+    print_header "Interactive Self-Coding Session"
+    if [ ! -d "venv" ]; then
+        error "Virtual environment not found. Please run ./scripts/setup.sh first."
+    fi
+    source venv/bin/activate
+
+    # Ask for workspace path
+    local workspace
+    workspace=$(dialog --stdout --inputbox "Enter workspace path (default: current directory):" 8 60 "$PWD")
+    if [ -z "$workspace" ]; then
+        workspace="$PWD"
+    fi
+
+    info "Starting self-coding agent with workspace: $workspace"
+    info "Type 'help' for commands, 'exit' to quit"
+    python3 main.py --self-code --workspace "$workspace"
+}
+
+# Action: Test MCP Servers
+do_test() {
+    print_header "Testing MCP Servers and Tools"
+    if [ ! -d "venv" ]; then
+        error "Virtual environment not found. Please run ./scripts/setup.sh first."
+    fi
+    source venv/bin/activate
+
+    info "Running MCP server tests..."
+    python3 main.py --mcp-test
+
+    read -p "Press Enter to continue..."
 }
 
 # --- TUI Implementation ---
@@ -167,13 +221,16 @@ main_menu() {
                     --backtitle "SWORD Launcher | Cursed AI Framework" \
                     --title "Main Menu" \
                     --menu "Select an action:" \
-                    16 60 5 \
+                    20 70 8 \
                     "Run" "Start the SWORD Coder MoE Router" \
+                    "IDE" "Launch Self-Coding IDE (Textual TUI)" \
+                    "SelfCode" "Start Interactive Self-Coding Session" \
                     "Download" "Download all required models" \
                     "Quantize" "Run the quantization pipeline" \
                     "Bootstrap" "Build and install the Intel compute stack" \
+                    "Test" "Test MCP servers and tools" \
                     "Exit" "Exit the launcher")
-    
+
     # The CHOICE variable will hold the tag of the selected menu item.
     # e.g., "Run", "Download", etc.
 }
@@ -216,6 +273,12 @@ while true; do
         "Run")
             do_run
             ;;
+        "IDE")
+            do_ide
+            ;;
+        "SelfCode")
+            do_selfcode
+            ;;
         "Download")
             do_download_models
             ;;
@@ -224,6 +287,9 @@ while true; do
             ;;
         "Bootstrap")
             do_bootstrap_intel
+            ;;
+        "Test")
+            do_test
             ;;
         "Exit" | "")
             clear
