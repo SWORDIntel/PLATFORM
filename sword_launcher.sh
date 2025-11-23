@@ -7,6 +7,7 @@
 set -eo pipefail
 PROJECT_ROOT=$(dirname "$(readlink -f "$0")")
 cd "$PROJECT_ROOT"
+VENV_DIR=""
 
 # --- Colors and Formatting ---
 RED='\033[0;31m'
@@ -28,6 +29,29 @@ error() {
     exit 1
 }
 
+ensure_venv() {
+    # Detect or create a virtual environment, then activate it.
+    if [ -z "$VENV_DIR" ]; then
+        if [ -d "venv" ]; then
+            VENV_DIR="venv"
+        elif [ -d ".venv" ]; then
+            VENV_DIR=".venv"
+        else
+            info "Virtual environment not found. Running ./scripts/setup.sh..."
+            bash scripts/setup.sh
+            VENV_DIR="venv"
+        fi
+    fi
+
+    # Safety: if setup failed to create the venv, bail out.
+    if [ ! -d "$VENV_DIR" ]; then
+        error "Virtual environment still missing after setup. Please check ./scripts/setup.sh output."
+    fi
+
+    # shellcheck source=/dev/null
+    source "$VENV_DIR/bin/activate"
+}
+
 print_header() {
     echo -e "\n${YELLOW}=====================================================${NC}"
     echo -e "${YELLOW} $1${NC}"
@@ -38,21 +62,15 @@ print_header() {
 check_dialog() {
     if ! command -v dialog &> /dev/null; then
         clear
-        warn "The 'dialog' utility is not installed. It is required for the TUI."
-        read -p "Do you want to attempt to install it now (requires sudo)? (y/N) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            if command -v apt-get &> /dev/null; then
-                sudo apt-get update && sudo apt-get install -y dialog
-            elif command -v dnf &> /dev/null; then
-                sudo dnf install -y dialog
-            elif command -v pacman &> /dev/null; then
-                sudo pacman -S --noconfirm dialog
-            else
-                error "Could not determine package manager. Please install 'dialog' manually."
-            fi
+        warn "The 'dialog' utility is not installed. Attempting automatic installation (requires sudo)..."
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y dialog || error "Failed to install 'dialog' via apt-get."
+        elif command -v dnf &> /dev/null; then
+            sudo dnf install -y dialog || error "Failed to install 'dialog' via dnf."
+        elif command -v pacman &> /dev/null; then
+            sudo pacman -Sy --noconfirm dialog || error "Failed to install 'dialog' via pacman."
         else
-            error "'dialog' is required to continue. Aborting."
+            error "Could not determine package manager. Please install 'dialog' manually."
         fi
         clear
     fi
@@ -80,16 +98,16 @@ do_bootstrap_intel() {
     pushd IntelStack > /dev/null
     
     info "Step 1/4: Building gmmlib..."
-    ./build_gmmlib.sh "${build_root}"
+    bash ./build_gmmlib.sh "${build_root}"
     
     info "Step 2/4: Building igc..."
-    ./build_igc.sh "${build_root}"
+    bash ./build_igc.sh "${build_root}"
 
     info "Step 3/4: Building compute-runtime..."
-    ./build_compute_runtime.sh "${build_root}"
+    bash ./build_compute_runtime.sh "${build_root}"
 
     info "Step 4/4: Installing Intel Extension for PyTorch..."
-    ./install_ipex.sh
+    bash ./install_ipex.sh
 
     popd > /dev/null
     print_header "Intel Stack Bootstrap Complete"
@@ -98,20 +116,20 @@ do_bootstrap_intel() {
 # Action: Download Models
 do_download_models() {
     print_header "Model Downloader"
+    ensure_venv
+
     if ! command -v aria2c &> /dev/null; then
-        warn "aria2c is not installed. It is required for fast parallel downloads."
-        read -p "Do you want to attempt to install it via snap? (y/N) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            if ! command -v snap &> /dev/null; then
-                info "snapd not found. Attempting to install it with apt..."
-                sudo apt-get update && sudo apt-get install -y snapd || error "Failed to install snapd."
-            fi
-            info "Installing aria2c via snap..."
+        warn "aria2c is not installed. Attempting automatic installation (requires sudo)..."
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y aria2 || sudo apt-get install -y aria2c || error "Failed to install aria2c via apt-get."
+        elif command -v dnf &> /dev/null; then
+            sudo dnf install -y aria2 || sudo dnf install -y aria2c || error "Failed to install aria2c via dnf."
+        elif command -v pacman &> /dev/null; then
+            sudo pacman -Sy --noconfirm aria2 || sudo pacman -Sy --noconfirm aria2c || error "Failed to install aria2c via pacman."
+        elif command -v snap &> /dev/null; then
             sudo snap install aria2c || error "Failed to install aria2c via snap."
-            info "aria2c installed successfully."
         else
-            error "aria2c is required. Aborting."
+            error "aria2c is required but no supported installer was found."
         fi
     fi
 
@@ -137,10 +155,7 @@ do_download_models() {
 # Action: Quantize Models
 do_quantize() {
     print_header "Quantization Pipeline"
-    if [ ! -d "venv" ]; then
-        error "Virtual environment not found. Please run ./scripts/setup.sh first."
-    fi
-    source venv/bin/activate
+    ensure_venv
     
     info "Starting quantization process..."
     python3 scripts/run_quantization.py "$1"
@@ -151,10 +166,7 @@ do_quantize() {
 # Action: Run Router
 do_run() {
     print_header "Launching SWORD Coder MoE Router"
-    if [ ! -d "venv" ]; then
-        error "Virtual environment not found. Please run ./scripts/setup.sh first."
-    fi
-    source venv/bin/activate
+    ensure_venv
 
     info "Starting application... Press Ctrl+C to stop."
     python3 main.py
@@ -163,10 +175,7 @@ do_run() {
 # Action: Launch IDE
 do_ide() {
     print_header "Launching Self-Coding IDE"
-    if [ ! -d "venv" ]; then
-        error "Virtual environment not found. Please run ./scripts/setup.sh first."
-    fi
-    source venv/bin/activate
+    ensure_venv
 
     # Ask for workspace path
     local workspace
@@ -183,10 +192,7 @@ do_ide() {
 # Action: Self-Coding Session
 do_selfcode() {
     print_header "Interactive Self-Coding Session"
-    if [ ! -d "venv" ]; then
-        error "Virtual environment not found. Please run ./scripts/setup.sh first."
-    fi
-    source venv/bin/activate
+    ensure_venv
 
     # Ask for workspace path
     local workspace
@@ -203,10 +209,7 @@ do_selfcode() {
 # Action: Codebreaker (with optional SUPERCOP benchmark)
 do_codebreaker() {
     print_header "Codebreaker Mode"
-    if [ ! -d "venv" ]; then
-        error "Virtual environment not found. Please run ./scripts/setup.sh first."
-    fi
-    source venv/bin/activate
+    ensure_venv
 
     local payload devices supercop_path bench_flag="" command_args=()
 
@@ -238,10 +241,7 @@ do_codebreaker() {
 # Action: Codebreaker benchmark (SUPERCOP always enabled)
 do_codebreaker_bench() {
     print_header "Codebreaker Benchmark"
-    if [ ! -d "venv" ]; then
-        error "Virtual environment not found. Please run ./scripts/setup.sh first."
-    fi
-    source venv/bin/activate
+    ensure_venv
 
     local payload devices supercop_path command_args=()
 
@@ -267,10 +267,7 @@ do_codebreaker_bench() {
 # Action: Router benchmarks
 do_benchmark() {
     print_header "Router Benchmark Suite"
-    if [ ! -d "venv" ]; then
-        error "Virtual environment not found. Please run ./scripts/setup.sh first."
-    fi
-    source venv/bin/activate
+    ensure_venv
     info "Executing benchmark suite..."
     python3 main.py --benchmark
 }
@@ -278,10 +275,7 @@ do_benchmark() {
 # Action: Test MCP Servers
 do_test() {
     print_header "Testing MCP Servers and Tools"
-    if [ ! -d "venv" ]; then
-        error "Virtual environment not found. Please run ./scripts/setup.sh first."
-    fi
-    source venv/bin/activate
+    ensure_venv
 
     info "Running MCP server tests..."
     python3 main.py --mcp-test
