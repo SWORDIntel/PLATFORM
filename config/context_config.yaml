@@ -1,0 +1,248 @@
+# Context Window and Memory Configuration
+# Optimized for 50GB available RAM + GPU shared memory
+
+context_management:
+  # Hardware resources
+  hardware:
+    total_ram_gb: 64
+    available_ram_gb: 50
+    gpu_shared_memory_gb: 12  # iGPU shared with system RAM
+
+  # Maximum context windows by model
+  max_context_tokens:
+    # Code models with extended context
+    deepseek-coder-33b: 16384      # Standard
+    deepseek-coder-33b-extended: 32768  # With RAM buffer
+
+    codellama-70b: 16384
+    codellama-70b-extended: 32768
+
+    # Reasoning models
+    deepseek-r1-distill-qwen-7b: 32768
+    deepseek-r1-distill-qwen-32b: 65536  # Maximum with RAM buffer
+
+    # General LLMs
+    llama-3-70b: 8192
+    llama-3-70b-extended: 16384
+
+    # Uncensored models
+    wizardlm-13b-uncensored: 8192
+    wizardcoder-python-34b: 16384
+
+  # Context buffer strategy
+  buffer_strategy:
+    # Use RAM for extended context buffering
+    ram_buffer_gb: 30  # Allocate 30GB for context buffering
+    gpu_buffer_gb: 8   # Use GPU shared memory
+    disk_buffer_gb: 100  # Disk swap for very long contexts
+
+    # Context tiers
+    tiers:
+      - name: "active"
+        size_tokens: 16384
+        location: "gpu_memory"
+        description: "Currently active context in GPU memory"
+
+      - name: "recent"
+        size_tokens: 32768
+        location: "ram"
+        description: "Recent context in RAM for fast retrieval"
+
+      - name: "session"
+        size_tokens: 131072  # 128K tokens
+        location: "ram"
+        description: "Full session context in RAM (50GB allows ~128K tokens)"
+
+      - name: "archive"
+        size_tokens: 524288  # 512K tokens
+        location: "disk"
+        description: "Archived context on disk for very long sessions"
+
+  # Context compression
+  compression:
+    enabled: true
+    method: "semantic_compression"
+
+    # Compress older context to fit more
+    strategies:
+      - trigger_tokens: 100000
+        action: "compress_oldest_25_percent"
+        compression_ratio: 0.5
+
+      - trigger_tokens: 200000
+        action: "compress_oldest_50_percent"
+        compression_ratio: 0.3
+
+      - trigger_tokens: 400000
+        action: "compress_oldest_75_percent"
+        compression_ratio: 0.2
+
+  # Smart context management
+  smart_context:
+    # Automatically manage context based on importance
+    importance_scoring: true
+
+    # Keep important items in active context
+    always_keep:
+      - "system_prompt"
+      - "task_description"
+      - "recent_code_changes"
+      - "error_messages"
+      - "user_instructions"
+
+    # Can compress or archive
+    can_compress:
+      - "old_file_contents"
+      - "search_results"
+      - "historical_actions"
+      - "completed_tasks"
+
+# Session persistence and resume
+session_management:
+  # Enable session saving
+  persistence:
+    enabled: true
+    auto_save_interval_seconds: 300  # Save every 5 minutes
+    save_directory: "/tmp/sword_sessions"
+    max_sessions: 10  # Keep last 10 sessions
+
+  # Session data to persist
+  save_data:
+    - "conversation_history"
+    - "agent_tasks"
+    - "action_history"
+    - "open_files"
+    - "context_memory"
+    - "knowledge_graph"  # From memlayer
+    - "code_changes"
+
+  # Compression for sessions
+  session_compression:
+    enabled: true
+    format: "zstd"  # Fast compression with good ratio
+    compression_level: 3
+
+  # Resume options
+  resume:
+    prompt_on_startup: true
+    show_recent_sessions: 5
+    auto_resume_last: false  # Ask user first
+
+  # Session metadata
+  metadata:
+    - "session_id"
+    - "created_at"
+    - "last_active"
+    - "workspace_path"
+    - "task_count"
+    - "file_count"
+    - "context_size_tokens"
+
+# Long context strategies
+long_context:
+  # Enable extended context via RAM buffering
+  extended_context:
+    enabled: true
+    max_tokens: 131072  # 128K tokens (~50-60GB model + context)
+
+  # Hierarchical context
+  hierarchy:
+    # Level 1: Immediate (in GPU)
+    immediate:
+      tokens: 16384
+      ttl_seconds: 300  # 5 minutes
+
+    # Level 2: Recent (in RAM)
+    recent:
+      tokens: 32768
+      ttl_seconds: 1800  # 30 minutes
+
+    # Level 3: Session (in RAM)
+    session:
+      tokens: 131072
+      ttl_seconds: 7200  # 2 hours
+
+    # Level 4: Archive (on disk)
+    archive:
+      tokens: 524288
+      ttl_seconds: 86400  # 24 hours
+
+  # Context retrieval
+  retrieval:
+    method: "semantic_search"
+    embedding_model: "bge-large-en-v1.5"
+    top_k: 10
+    similarity_threshold: 0.75
+
+  # Caching
+  cache:
+    enabled: true
+    cache_embeddings: true
+    cache_compressed_context: true
+    cache_location: "/tmp/sword_context_cache"
+
+# Memory optimization
+memory_optimization:
+  # Model quantization for more RAM headroom
+  aggressive_quantization:
+    enabled: true
+    large_models_int4: true  # 70B models in INT4
+    medium_models_int8: true  # 13-34B models in INT8
+
+  # Offloading strategy
+  offload:
+    # Offload layers to CPU RAM when GPU full
+    cpu_offload_enabled: true
+    cpu_offload_layers: "auto"  # Automatically determine
+
+    # Keep attention in GPU, offload FFN to RAM
+    attention_in_gpu: true
+    ffn_in_ram: true
+
+  # KV cache management
+  kv_cache:
+    # Store KV cache in RAM for long contexts
+    ram_kv_cache: true
+    max_kv_cache_gb: 20  # Up to 20GB for KV cache
+
+    # Compress old KV cache
+    compress_old_kv: true
+    compression_threshold_tokens: 32768
+
+# Integration with MCP servers
+mcp_context_integration:
+  # Use memlayer for context overflow
+  memlayer_overflow:
+    enabled: true
+    store_old_context: true
+    retrieval_on_demand: true
+
+  # Use context7 for code context
+  context7_code:
+    enabled: true
+    index_workspace: true
+    semantic_code_search: true
+
+  # Heretic for unrestricted analysis
+  heretic_analysis:
+    enabled: true
+    store_analysis_results: true
+    max_permissiveness: true  # No content filtering
+
+# Performance monitoring
+monitoring:
+  track_memory_usage: true
+  track_context_size: true
+  track_retrieval_latency: true
+  log_file: "/tmp/sword_context_monitor.log"
+
+  # Alerts
+  alerts:
+    memory_threshold_gb: 45  # Alert if RAM usage > 45GB
+    context_threshold_tokens: 100000  # Alert if context > 100K
+
+  # Auto-optimization
+  auto_optimize:
+    enabled: true
+    compress_on_threshold: true
+    offload_on_memory_pressure: true
