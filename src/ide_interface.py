@@ -359,6 +359,7 @@ class CommandPalette(ModalScreen):
         ("Agent Status", "agent_status", "F4"),
         ("Git Status", "git_status", "F5"),
         ("Codebreaker", "codebreaker", "F6"),
+        ("Bench Codebreaker", "codebreaker_bench", "F7"),
         ("Help", "help", "F1"),
         ("Quit", "quit", "Ctrl+Q"),
     ]
@@ -747,6 +748,7 @@ class IDEInterface(App):
         Binding("f4", "agent_status", "Status"),
         Binding("f5", "git_status", "Git"),
         Binding("f6", "codebreaker", "Codebreaker"),
+        Binding("f7", "codebreaker_bench", "CB Bench"),
     ]
 
     def __init__(self, workspace_root: str = None, **kwargs):
@@ -801,7 +803,7 @@ class IDEInterface(App):
         terminal.write("╚═══════════════════════════════════════════════════════╝", style="bold blue")
         terminal.write(f"Workspace: {self.workspace_root}")
         terminal.write("Type a coding task below or use Ctrl+P for command palette")
-        terminal.write("Press F1 for help\n")
+        terminal.write("Press F1 for help | F6 Codebreaker | F7 Benchmark+Codebreaker\n")
 
     @on(DirectoryTree.FileSelected)
     def on_file_selected(self, event: DirectoryTree.FileSelected):
@@ -970,6 +972,10 @@ class IDEInterface(App):
         """Trigger codebreaker analysis (F6)."""
         self.launch_codebreaker()
 
+    def action_codebreaker_bench(self):
+        """Trigger codebreaker analysis with SUPERCOP benchmarking (F7)."""
+        self.launch_codebreaker(benchmark_crypto=True)
+
     def open_file_by_path(self, file_path: str):
         """Open file by path."""
         full_path = os.path.join(self.workspace_root, file_path)
@@ -1054,6 +1060,7 @@ class IDEInterface(App):
         terminal.write("  F4         - Agent status")
         terminal.write("  F5         - Git status")
         terminal.write("  F6         - Codebreaker hardware check")
+        terminal.write("  F7         - Codebreaker + SUPERCOP benchmark")
         terminal.write("\n╔═══ Commands ═══╗", style="bold blue")
         terminal.write("  help         - Show this help")
         terminal.write("  status       - Show agent status")
@@ -1062,6 +1069,7 @@ class IDEInterface(App):
         terminal.write("  sessions     - List saved sessions")
         terminal.write("  save         - Save current session")
         terminal.write("  resume ID    - Resume session by ID")
+        terminal.write("  codebreaker [PAYLOAD] [devices=a,b] [benchmark] - Decode payload + optimize selection; append 'benchmark' to run SUPERCOP")
         terminal.write("  codebreaker [PAYLOAD] [devices=a,b] - Decode payload + optimize selection")
         terminal.write("  prompt: TEXT - Direct LLM prompting")
         terminal.write("  llm: TEXT    - Direct LLM prompting (alias)")
