@@ -17,6 +17,10 @@ if command -v g++-13 > /dev/null; then
 else
   cxx_bin="g++-12"
 fi
+# Add CPU‑specific optimisation flag for Alder Lake
+export CFLAGS="-march=alderlake -O2"
+export CXXFLAGS="-march=alderlake -O2 $CXXFLAGS"
+
 llvm_version="16.0.6"
 llvm_tarball=""
 llvm_url=""
@@ -63,7 +67,12 @@ build_llvm16_from_source() {
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_ENABLE_PROJECTS="clang;lld" \
     -DLLVM_TARGETS_TO_BUILD="X86" \
-    -DCMAKE_INSTALL_PREFIX="${llvm_prefix}"
+    -DCMAKE_INSTALL_PREFIX="${llvm_prefix}" \
+    -DCMAKE_CXX_STANDARD=17 \
+    -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+    -DCMAKE_C_FLAGS="-march=alderlake -O2" \
+    -DCMAKE_CXX_FLAGS="-march=alderlake -O2"
+
 
   cmake --build "${llvm_build}" -j"$(nproc)"
   cmake --install "${llvm_build}"
@@ -235,6 +244,12 @@ detect_and_install_spirv_translator() {
   if pkg-config --exists SPIRV-Tools 2>/dev/null && \
      [[ -d "/usr/lib/cmake/SPIRVLLVMTranslator" || -d "/usr/lib64/cmake/SPIRVLLVMTranslator" ]]; then
     return
+  fi
+
+  # Ensure SPIRV-Tools source is present (required for IGC build)
+  if [[ ! -d "${workspace}/SPIRV-Tools" ]]; then
+    echo -e "${YELLOW}Cloning SPIRV-Tools source...${NC}"
+    git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Tools "${workspace}/SPIRV-Tools"
   fi
 
   # Build from source if not found
