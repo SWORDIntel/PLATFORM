@@ -29,6 +29,30 @@ error() {
     exit 1
 }
 
+ensure_sys_deps() {
+    # Install common system dependencies for builds and tooling.
+    if command -v apt-get &>/dev/null; then
+        sudo apt-get update
+        sudo apt-get install -y \
+            build-essential git cmake pkg-config ninja-build \
+            python3 python3-venv python3-pip \
+            wget curl lsb-release gnupg \
+            gcc-12 g++-12 libdrm-dev libpciaccess-dev libelf-dev
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y \
+            @development-tools git cmake pkgconf-pkg-config ninja-build \
+            python3 python3-virtualenv python3-pip \
+            wget curl redhat-lsb-core gnupg2 \
+            gcc gcc-c++ libdrm-devel libpciaccess-devel libelf-devel
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Sy --noconfirm \
+            base-devel git cmake pkgconf ninja \
+            python python-virtualenv python-pip \
+            wget curl lsb-release gnupg \
+            gcc libdrm libpciaccess libelf
+    fi
+}
+
 ensure_venv() {
     # Detect or create a virtual environment, then activate it.
     if [ -z "$VENV_DIR" ]; then
@@ -94,6 +118,9 @@ do_bootstrap_intel() {
     local build_root="$HOME/intel-compute-runtime-build"
     info "Using build root: ${build_root}"
     mkdir -p "${build_root}"
+
+    info "Ensuring system dependencies are installed..."
+    ensure_sys_deps
 
     pushd IntelStack > /dev/null
     
