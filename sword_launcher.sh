@@ -8,6 +8,7 @@ set -eo pipefail
 PROJECT_ROOT=$(dirname "$(readlink -f "$0")")
 cd "$PROJECT_ROOT"
 VENV_DIR=""
+SELF_TEST=0
 
 # --- Colors and Formatting ---
 RED='\033[0;31m'
@@ -62,7 +63,12 @@ ensure_venv() {
             VENV_DIR=".venv"
         else
             info "Virtual environment not found. Running ./scripts/setup.sh..."
-            bash scripts/setup.sh
+            if [ "$EUID" -eq 0 ] && [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+                info "Detected sudo; creating venv as ${SUDO_USER} to avoid root-owned installs."
+                sudo -u "$SUDO_USER" -H bash -c "cd \"$PROJECT_ROOT\" && bash scripts/setup.sh"
+            else
+                bash scripts/setup.sh
+            fi
             VENV_DIR="venv"
         fi
     fi
@@ -101,6 +107,50 @@ check_dialog() {
 }
 
 # --- Action Functions (retained from previous script) ---
+
+self_test() {
+    print_header "Launcher Self-Test (non-interactive)"
+    ensure_venv
+
+    info "Checking dialog availability..."
+    if ! command -v dialog &> /dev/null; then
+        error "dialog is missing even after auto-install."
+    fi
+
+    info "Checking aria2c availability..."
+    if ! command -v aria2c &> /dev/null; then
+        warn "aria2c still missing; downloads will fail."
+    fi
+
+    info "Running: python main.py --help"
+    python main.py --help >/dev/null
+
+    info "Running: python main.py --codebreaker --help"
+    python main.py --codebreaker --help >/dev/null
+
+    info "Running: python main.py --self-code --help"
+    python main.py --self-code --help >/dev/null
+
+    info "Running: python main.py --ide --help"
+    python main.py --ide --help >/dev/null
+
+    info "Running: python main.py --mcp-test --help"
+    python main.py --mcp-test --help >/dev/null 2>&1 || true
+
+    info "Running: python scripts/get_model_urls.py"
+    python scripts/get_model_urls.py >/dev/null
+
+    info "Running: python scripts/run_quantization.py --help"
+    python scripts/run_quantization.py --help >/dev/null
+
+    info "Checking IntelStack scripts readability..."
+    for f in IntelStack/build_gmmlib.sh IntelStack/build_igc.sh IntelStack/build_compute_runtime.sh IntelStack/install_ipex.sh; do
+        [ -r "$f" ] || error "Missing or unreadable: $f"
+    done
+
+    print_header "Self-Test Complete"
+    exit 0
+}
 
 # Action: Bootstrap Intel Stack
 do_bootstrap_intel() {
@@ -172,7 +222,7 @@ do_download_models() {
         warn "No model URLs were found. Check 'config/models.yaml'."
     else
         info "Starting download with aria2c... (See aria-log.txt for details)"
-        aria2c --input-file="$urls_file" --dir="$model_dir" --continue=true --max-concurrent-downloads=5 --max-connection-per-server=8 --split=8 --min-split-size=1M --log="aria-log.txt" --log-level=warn --summary-interval=10 --human-readable=true --git-clone-with-full-history --auto-file-renaming=false -x 16 -s 16 -k 1M
+        aria2c --input-file="$urls_file" --dir="$model_dir" --continue=true --max-concurrent-downloads=5 --max-connection-per-server=8 --split=8 --min-split-size=1M --log="aria-log.txt" --log-level=warn --summary-interval=10 --human-readable=true --auto-file-renaming=false -x 16 -s 16 -k 1M
     fi
     
     rm -f "$urls_file"
@@ -362,6 +412,23 @@ quantize_menu() {
             ;;
     esac
 }
+
+# --- Argument Parsing (non-TUI) ---
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --self-test)
+            SELF_TEST=1
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [ "$SELF_TEST" -eq 1 ]; then
+    self_test
+fi
 
 # --- Main Execution Loop ---
 check_dialog

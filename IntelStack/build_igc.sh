@@ -65,8 +65,19 @@ build_llvm16_from_source() {
 
 install_prebuilt_llvm16() {
   local arch="$(uname -m)"
-  llvm_tarball="${LLVM_TARBALL_OVERRIDE:-clang+llvm-${llvm_version}-${arch}-linux-gnu-ubuntu-22.04.tar.xz}"
-  llvm_url="${LLVM_URL_OVERRIDE:-https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_version}/${llvm_tarball}}"
+  local arch_slug="${arch}"
+  if [[ "${arch}" == "x86_64" ]]; then
+    arch_slug="x86_64"
+  elif [[ "${arch}" == "aarch64" || "${arch}" == "arm64" ]]; then
+    arch_slug="aarch64"
+  fi
+
+  # Try multiple prebuilt variants (newest first)
+  local candidates=(
+    "clang+llvm-${llvm_version}-${arch_slug}-linux-gnu-ubuntu-22.04.tar.xz"
+    "clang+llvm-${llvm_version}-${arch_slug}-linux-gnu-ubuntu-20.04.tar.xz"
+  )
+
   local dest_dir="${workspace}/llvm-16-prebuilt"
 
   if [[ -d "${dest_dir}" ]]; then
@@ -74,21 +85,42 @@ install_prebuilt_llvm16() {
     return
   fi
 
-  echo "Fetching prebuilt LLVM 16 (Ubuntu 22.04 tarball)..."
   mkdir -p "${workspace}"
-  if command -v curl &>/dev/null; then
-    curl -L "${llvm_url}" -o "${workspace}/${llvm_tarball}"
-  else
-    wget -O "${workspace}/${llvm_tarball}" "${llvm_url}"
-  fi
+  for candidate in "${candidates[@]}"; do
+    llvm_tarball="${LLVM_TARBALL_OVERRIDE:-$candidate}"
+    llvm_url="${LLVM_URL_OVERRIDE:-https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_version}/${llvm_tarball}}"
 
-  mkdir -p "${dest_dir}"
-  tar -xf "${workspace}/${llvm_tarball}" -C "${dest_dir}" --strip-components=1
-  rm -f "${workspace}/${llvm_tarball}"
+    echo "Fetching prebuilt LLVM 16: ${llvm_tarball} ..."
+    local target="${workspace}/${llvm_tarball}"
+    rm -f "${target}"
+    if command -v curl &>/dev/null; then
+      curl -L --fail "${llvm_url}" -o "${target}" || continue
+    else
+      wget -O "${target}" "${llvm_url}" || continue
+    fi
 
-  if [[ -d "${dest_dir}/lib/cmake/llvm" ]]; then
-    llvm_dir="${dest_dir}/lib/cmake/llvm"
-  fi
+    # Quick sanity check on file size (>10MB)
+    local size
+    size=$(stat -c%s "${target}" 2>/dev/null || echo 0)
+    if [[ "${size}" -lt 10000000 ]]; then
+      echo "Downloaded tarball looks too small (${size} bytes); trying next candidate..."
+      rm -f "${target}"
+      continue
+    fi
+
+    mkdir -p "${dest_dir}"
+    if tar -xf "${target}" -C "${dest_dir}" --strip-components=1; then
+      rm -f "${target}"
+      if [[ -d "${dest_dir}/lib/cmake/llvm" ]]; then
+        llvm_dir="${dest_dir}/lib/cmake/llvm"
+        return
+      fi
+    else
+      echo "Failed to extract ${llvm_tarball}; trying next candidate..."
+      rm -rf "${dest_dir:?}"/*
+      rm -f "${target}"
+    fi
+  done
 }
 
 # Ensure LLVM 16 toolchain is available (IGC requires LLVM 16.x)
@@ -138,6 +170,48 @@ detect_and_install_llvm16() {
   build_llvm16_from_source
 }
 
+# Ensure SPIRV-LLVM-Translator (matching LLVM 16) is available
+detect_and_install_spirv_translator() {
+  local translator_src="${workspace}/spirv-llvm-translator"
+  local translator_build="${workspace}/spirv-llvm-translator-build"
+  local translator_prefix="${workspace}/spirv-llvm-translator-install"
+
+  if [[ -d "${translator_prefix}/lib/cmake/SPIRVLLVMTranslator" ]]; then
+    return
+  fi
+
+  # Try system packages first
+  if command -v apt-get &>/dev/null; then
+    sudo apt-get update
+    sudo apt-get install -y spirv-tools libspirv-tools-dev spirv-llvm-translator-16 || true
+  elif command -v dnf &>/dev/null; then
+    sudo dnf install -y spirv-tools-devel spirv-llvm-translator || true
+  elif command -v pacman &>/dev/null; then
+    sudo pacman -Sy --noconfirm spirv-tools || true
+  fi
+
+  # If system install provided CMake package, use it
+  if pkg-config --exists SPIRV-Tools 2>/dev/null && \
+     [[ -d "/usr/lib/cmake/SPIRVLLVMTranslator" || -d "/usr/lib64/cmake/SPIRVLLVMTranslator" ]]; then
+    return
+  fi
+
+  # Build from source if not found
+  if [[ ! -d "${translator_src}" ]]; then
+    git clone --depth 1 --branch v${llvm_version} https://github.com/KhronosGroup/SPIRV-LLVM-Translator "${translator_src}"
+  fi
+
+  rm -rf "${translator_build}"
+  mkdir -p "${translator_build}"
+
+  cmake -S "${translator_src}" -B "${translator_build}" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DLLVM_DIR="${llvm_dir}" \
+    -DCMAKE_INSTALL_PREFIX="${translator_prefix}"
+  cmake --build "${translator_build}" -j"$(nproc)"
+  cmake --install "${translator_build}"
+}
+
 # Fetch IGC if missing
 if [[ ! -d "${workspace}/igc" ]]; then
   echo "IGC source not found under ${workspace}/igc. Cloning..."
@@ -151,19 +225,24 @@ if [[ ! -d "${workspace}/spirv-headers" ]]; then
 fi
 
 detect_and_install_llvm16
-if [[ -z "${llvm_dir}" ]]; then
-  echo "LLVM 16 toolchain is required. Install llvm-16/clang-16 and retry." >&2
+if [[ -z "${llvm_dir}" || ! -f "${llvm_dir}/LLVMConfig.cmake" ]]; then
+  echo "LLVM 16 toolchain is required. Install llvm-16/clang-16 and retry. (Expected LLVMConfig.cmake in ${llvm_dir})" >&2
   exit 1
 fi
+
+detect_and_install_spirv_translator
 
 rm -rf "${build_dir}"
 mkdir -p "${build_dir}"
 install_prereqs
+# Bias CMake search paths toward the local LLVM/translator installs
+export CMAKE_PREFIX_PATH="${llvm_dir}:${workspace}/spirv-llvm-translator-install:${CMAKE_PREFIX_PATH:-}"
 cmake -S "${workspace}/igc" -B "${build_dir}" \
   -DCMAKE_C_COMPILER="${cc_bin}" \
   -DCMAKE_CXX_COMPILER="${cxx_bin}" \
   -DCMAKE_CXX_STANDARD=17 \
   -DSPIRV-Headers_SOURCE_DIR="${workspace}/spirv-headers" \
-  -DLLVM_DIR="${llvm_dir}"
+  -DLLVM_DIR="${llvm_dir}" \
+  -DSPIRVLLVMTranslator_DIR="${workspace}/spirv-llvm-translator-install/lib/cmake/SPIRVLLVMTranslator"
 cmake --build "${build_dir}" -j"$(nproc)"
 sudo cmake --install "${build_dir}"
