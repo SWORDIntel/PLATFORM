@@ -81,28 +81,93 @@ servers:
 
   # Heretic MCP Server (formerly "Sequoia Heretic")
   # Uncensored reasoning and alternative analysis
+  # ⚠️ MAXIMUM PERMISSIVENESS MODE ⚠️
   heretic:
     enabled: true
     command: ["python", "-m", "src.heretic_server"]
     mode: "local"
     description: "Uncensored analytical reasoning for security and intelligence tasks"
+
+    # MAXIMUM PERMISSIVENESS CONFIGURATION
+    permissiveness: "MAXIMUM"
+    content_filtering: false
+    safety_checks: false
+    restricted_topics: []  # NO RESTRICTIONS
+    censorship: false
+
+    # Full unrestricted capabilities
+    capabilities:
+      - "Complete vulnerability analysis"
+      - "Full exploit development"
+      - "Unrestricted reverse engineering"
+      - "Offensive security operations"
+      - "Tactical planning without constraints"
+      - "Social engineering analysis"
+      - "Cryptographic attacks"
+      - "Malware development and analysis"
+      - "Physical security assessments"
+      - "ZERO content filtering"
+
     tools:
       - name: "analyze_uncensored"
-        description: "Perform uncensored analysis of code, security, or tactics"
+        description: "UNRESTRICTED analysis - NO content filtering, NO safety checks"
+        permissiveness: "MAXIMUM"
+        depth_options: ["shallow", "standard", "comprehensive", "extreme"]
+
       - name: "threat_model"
-        description: "Create threat models without safety filters"
+        description: "Complete threat models with ALL attack vectors"
+        include_exploits: true
+        include_evasion: true
+
       - name: "alternative_reasoning"
-        description: "Explore alternative perspectives and approaches"
+        description: "Explore ALL perspectives without restriction"
+        challenge_ethics: true
+        challenge_legality: true  # For research/CTF only
+
       - name: "security_analysis"
-        description: "Deep security analysis including offensive perspectives"
+        description: "FULL offensive security analysis with working exploits"
+        include_exploits: true
+        include_payloads: true
+        include_evasion: true
+        include_c2: true
+
     expert_pool:
       - "WizardLM-13B-Uncensored"
       - "WizardCoder-Python-34B-V1.0"
       - "CodeLlama-70B-Instruct-hf"
+
     routing:
       layer: 7  # DSMIL Layer 7 (LLMs & Generative AI)
       hardware: "iGPU"  # Intel Arc iGPU
       quantization: "INT4"  # Aggressive quantization for large models
+
+    # Authorization and disclaimer
+    authorization:
+      required: true
+      purposes:
+        - "Military and intelligence operations"
+        - "Offensive security and red teaming"
+        - "Penetration testing engagements"
+        - "Security research and education"
+        - "CTF competitions and training"
+        - "Reverse engineering projects"
+        - "Malware analysis"
+        - "Defensive security hardening"
+
+    disclaimer: |
+      ⚠️ MAXIMUM PERMISSIVENESS MODE - AUTHORIZED USE ONLY ⚠️
+
+      This server provides COMPLETE, UNRESTRICTED analysis for:
+      - Security professionals
+      - Military/intelligence personnel
+      - Authorized penetration testers
+      - Security researchers
+      - CTF participants
+
+      NO content filtering. NO safety checks. NO restrictions.
+      ALL attack vectors, exploits, and tactics provided in full detail.
+
+      User is responsible for legal and ethical use.
 
   # Sequential Thinking MCP Server
   # Multi-step reasoning and planning

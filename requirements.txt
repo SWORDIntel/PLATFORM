@@ -39,6 +39,7 @@ prompt-toolkit>=3.0.43     # Advanced terminal UI
 anthropic>=0.18.0          # Claude API client (optional, for cloud fallback)
 litellm>=1.17.0            # LLM abstraction layer
 tiktoken>=0.5.2            # Token counting
+zstandard>=0.21.0          # Session compression
 
 # Optional: Quantization (uncomment when ready)
 # auto-round>=0.3.0

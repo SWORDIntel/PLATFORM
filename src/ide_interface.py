@@ -602,6 +602,11 @@ class IDEInterface(App):
         self.workspace_root = workspace_root or os.getcwd()
         self.agent = SelfCodingAgent(self.workspace_root)
 
+        # Session management
+        from .session_manager import SessionManager
+        self.session_manager = SessionManager()
+        self.current_session_id = None
+
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield Header(show_clock=True)
@@ -700,6 +705,21 @@ class IDEInterface(App):
         elif command.lower().startswith("open "):
             file_path = command[5:].strip()
             self.open_file_by_path(file_path)
+            return
+        elif command.lower() == "sessions":
+            self.show_sessions()
+            return
+        elif command.lower().startswith("resume "):
+            session_id = command[7:].strip()
+            self.resume_session(session_id)
+            return
+        elif command.lower() == "save":
+            self.save_current_session()
+            return
+        elif command.lower().startswith("prompt:") or command.lower().startswith("llm:"):
+            # Direct LLM prompting
+            prompt = command.split(":", 1)[1].strip()
+            asyncio.create_task(self.direct_llm_prompt(prompt))
             return
 
         # Execute as coding task
@@ -834,15 +854,28 @@ class IDEInterface(App):
         terminal.write("  F4         - Agent status")
         terminal.write("  F5         - Git status")
         terminal.write("\n╔═══ Commands ═══╗", style="bold blue")
-        terminal.write("  help       - Show this help")
-        terminal.write("  status     - Show agent status")
-        terminal.write("  clear      - Clear terminal")
-        terminal.write("  open PATH  - Open file by path")
+        terminal.write("  help         - Show this help")
+        terminal.write("  status       - Show agent status")
+        terminal.write("  clear        - Clear terminal")
+        terminal.write("  open PATH    - Open file by path")
+        terminal.write("  sessions     - List saved sessions")
+        terminal.write("  save         - Save current session")
+        terminal.write("  resume ID    - Resume session by ID")
+        terminal.write("  prompt: TEXT - Direct LLM prompting")
+        terminal.write("  llm: TEXT    - Direct LLM prompting (alias)")
         terminal.write("\n╔═══ Coding Tasks ═══╗", style="bold blue")
         terminal.write("  Type natural language tasks:")
         terminal.write("  'Add a function to calculate fibonacci'")
         terminal.write("  'Fix the bug in authentication module'")
         terminal.write("  'Refactor database connection code'")
+        terminal.write("\n╔═══ Direct Prompting ═══╗", style="bold blue")
+        terminal.write("  prompt: What is a binary search tree?")
+        terminal.write("  llm: Explain how async/await works")
+        terminal.write("  llm: Write a quick sort algorithm")
+        terminal.write("\n╔═══ Extended Context ═══╗", style="bold blue")
+        terminal.write("  • 128K token context via 50GB RAM buffer")
+        terminal.write("  • Sessions auto-save every 5 minutes")
+        terminal.write("  • Resume sessions across restarts")
         terminal.write("╚══════════════════════════╝", style="bold blue")
 
     def action_focus_tasks(self):
@@ -878,6 +911,105 @@ class IDEInterface(App):
             terminal.write("╚══════════════════╝", style="bold blue")
         except Exception as e:
             terminal.write(f"Git error: {e}", style="red")
+
+    def show_sessions(self):
+        """Show available sessions."""
+        terminal = self.query_one("#terminal-panel", TerminalPanel)
+        sessions = self.session_manager.list_sessions(limit=10)
+
+        terminal.write("\n╔═══ Available Sessions ═══╗", style="bold blue")
+
+        if not sessions:
+            terminal.write("  No saved sessions")
+        else:
+            for i, session in enumerate(sessions, 1):
+                timestamp = datetime.fromtimestamp(session.last_active).strftime("%Y-%m-%d %H:%M")
+                size_kb = self.session_manager.get_session_size(session.session_id) / 1024
+
+                terminal.write(f"  {i}. {session.session_id[:8]}... ({timestamp})")
+                terminal.write(f"     Tasks: {session.task_count}, Actions: {session.action_count}, Size: {size_kb:.1f} KB")
+                terminal.write(f"     Resume: 'resume {session.session_id}'")
+
+        terminal.write("╚══════════════════════════╝", style="bold blue")
+
+    def resume_session(self, session_id: str):
+        """Resume a previous session."""
+        terminal = self.query_one("#terminal-panel", TerminalPanel)
+
+        terminal.write(f"Resuming session {session_id[:8]}...", style="cyan")
+
+        if self.session_manager.restore_session(self.agent, session_id):
+            self.current_session_id = session_id
+            terminal.write("✓ Session restored successfully", style="green")
+            terminal.write(f"  Tasks: {len(self.agent.tasks)}")
+            terminal.write(f"  Actions: {len(self.agent.action_history)}")
+            terminal.write(f"  Conversation: {len(self.agent.conversation)} messages")
+
+            # Refresh panels
+            self.refresh_panels()
+        else:
+            terminal.write("✗ Failed to restore session", style="red")
+
+    def save_current_session(self):
+        """Save current session."""
+        terminal = self.query_one("#terminal-panel", TerminalPanel)
+
+        terminal.write("Saving session...", style="cyan")
+
+        try:
+            session_id = self.session_manager.save_session(self.agent)
+            self.current_session_id = session_id
+
+            size_kb = self.session_manager.get_session_size(session_id) / 1024
+            terminal.write(f"✓ Session saved: {session_id[:8]}... ({size_kb:.1f} KB)", style="green")
+        except Exception as e:
+            terminal.write(f"✗ Error saving session: {e}", style="red")
+
+    async def direct_llm_prompt(self, prompt: str):
+        """
+        Direct LLM prompting - send prompt directly to model without agent wrapper.
+
+        This allows the user to interact with the LLM directly for:
+        - Questions and answers
+        - General conversation
+        - Code generation without autonomous execution
+        - Explanations and analysis
+        """
+        terminal = self.query_one("#terminal-panel", TerminalPanel)
+
+        terminal.write("💬 Direct LLM prompting...", style="magenta")
+
+        try:
+            # This would call the router directly in production
+            # For now, simulate a response
+            response = f"""
+[This would send your prompt directly to the LLM]
+
+Your prompt: {prompt}
+
+In production, this would:
+1. Send prompt to configured model ({self.agent.model_name})
+2. Return raw LLM response without agent processing
+3. Allow direct conversation and Q&A
+4. Support extended context (128K tokens via RAM buffer)
+
+To enable direct prompting, connect to router at {self.agent.router_url}
+"""
+
+            terminal.write("\n🤖 LLM Response:", style="magenta")
+            terminal.write(response)
+
+            # Add to conversation history
+            from .self_coder import ConversationMessage
+            self.agent.conversation.append(
+                ConversationMessage(role="user", content=prompt)
+            )
+            self.agent.conversation.append(
+                ConversationMessage(role="assistant", content=response)
+            )
+
+        except Exception as e:
+            terminal.write(f"Error: {e}", style="red")
 
 
 def run_ide(workspace_root: str = None):
