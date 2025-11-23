@@ -6,8 +6,17 @@ set -euo pipefail
 workspace="${1:-$HOME/igc_workspace}"
 build_dir="${workspace}/build"
 llvm_dir=""
-cc_bin="gcc-12"
-cxx_bin="g++-12"
+# Default compiler (prefer gcc-13/g++-13 if installed)
+if command -v gcc-13 > /dev/null; then
+  cc_bin="gcc-13"
+else
+  cc_bin="gcc-12"
+fi
+if command -v g++-13 > /dev/null; then
+  cxx_bin="g++-13"
+else
+  cxx_bin="g++-12"
+fi
 llvm_version="16.0.6"
 llvm_tarball=""
 llvm_url=""

@@ -79,6 +79,7 @@ fi
 
 # Movidius
 MOVIDIUS_COUNT=$(lspci 2>/dev/null | grep -ci "movidius\|myriad" || echo "0")
+if [ -z "$MOVIDIUS_COUNT" ]; then MOVIDIUS_COUNT=0; fi
 if [ "$MOVIDIUS_COUNT" -gt 0 ]; then
     echo -e "${GREEN}✓ Movidius VPU detected: ${MOVIDIUS_COUNT}x${NC}"
 else

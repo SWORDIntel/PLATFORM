@@ -34,6 +34,16 @@ fi
 if [[ -d "venv" ]]; then
   echo -e "${YELLOW}Activating virtual environment...${NC}"
   source venv/bin/activate
+
+  # Install GCC 13 (required for LLVM 16 source builds)
+  if command -v apt-get > /dev/null; then
+    sudo apt-get update
+    sudo apt-get install -y gcc-13 g++-13 || true
+  elif command -v dnf > /dev/null; then
+    sudo dnf install -y gcc gcc-c++ || true
+  elif command -v pacman > /dev/null; then
+    sudo pacman -Sy --noconfirm gcc || true
+  fi
 else
   echo -e "${RED}Error:${NC} venv directory missing after setup"
   exit 1
