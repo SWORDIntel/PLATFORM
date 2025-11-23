@@ -20,12 +20,25 @@ python main.py
 python main.py --self-code
 ```
 
+### Run Codebreaker Mode
+```bash
+python main.py --codebreaker --payload "<encoded_payload>"
+# payload defaults to a bundled sample if omitted
+# optionally scope to accelerators: --devices npu,movidius (use "--devices all" to force the full list)
+# enable Simon/Speck SUPERCOP crypto benchmarks across all devices: --crypto-bench
+```
+
+From the `sword_launcher.sh` TUI menu you can now pick either **Codebreaker** (prompted for SUPERCOP) or **CB Bench** (always runs with SUPERCOP enabled) so both workflows are visible up front.
+
+Inside the IDE TUI, press `F6` or run `codebreaker` in the command box (optionally with `devices=npu,movidius benchmark`) to launch the same analysis with live progress, AI device inventory, SUPERCOP benchmarking, and per-selection optimization. Use `F7` to jump straight into the benchmark-enabled run. The modal now closes with an encryption-type guess, a sentence-likeness flag, and TOPS utilization.
+
 ## Features
 - 🤖 **Autonomous Coding Agent** - Claude-like self-coding with planning
 - 💻 **IDE Interface** - Full-featured TUI with file browser and terminal
 - 🔌 **MCP Integration** - context7, memlayer, filesystem, heretic servers
 - 🎯 **MoE Router** - Intelligent model routing across Intel hardware
 - ⚡ **Hardware Acceleration** - NPU, iGPU, Movidius VPU support
+- 🔍 **Codebreaker Mode** - Inspect encoded payloads and list available AI devices
 
 ## Documentation
 - **Self-Coding Guide**: [SELF_CODING.md](SELF_CODING.md)

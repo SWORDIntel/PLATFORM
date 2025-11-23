@@ -13,6 +13,7 @@ Usage:
 
 import sys
 import os
+from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
@@ -26,6 +27,11 @@ def main():
     parser.add_argument('--storage', action='store_true', help='Show storage estimates')
     parser.add_argument('--ide', action='store_true', help='Launch IDE interface')
     parser.add_argument('--self-code', action='store_true', help='Start self-coding interactive session')
+    parser.add_argument('--codebreaker', action='store_true', help='Analyze encoded payloads and hardware context')
+    parser.add_argument('--payload', default=None, help='Encoded payload to analyze in codebreaker mode')
+    parser.add_argument('--devices', default=None, help='Comma-separated accelerator keys to target in codebreaker mode')
+    parser.add_argument('--crypto-bench', action='store_true', help='Run Simon/Speck SUPERCOP benchmark alongside codebreaker')
+    parser.add_argument('--supercop-path', default=None, help='Override path to Simon/Speck SUPERCOP checkout')
     parser.add_argument('--workspace', default=os.getcwd(), help='Workspace root directory')
     parser.add_argument('--host', default='0.0.0.0', help='Router host')
     parser.add_argument('--port', type=int, default=8000, help='Router port')
@@ -78,6 +84,25 @@ def main():
         from self_coder import SelfCodingAgent
         agent = SelfCodingAgent(args.workspace)
         agent.interactive_session()
+        return
+
+    if args.codebreaker:
+        print("=" * 60)
+        print("SWORD Codebreaker Mode")
+        print("=" * 60)
+        from codebreaker import run_codebreaker_mode
+
+        device_keys = [k.strip() for k in args.devices.split(',')] if args.devices else None
+        if device_keys and any(k.lower() in {"all", "*"} for k in device_keys):
+            device_keys = None
+        supercop_path = Path(args.supercop_path) if args.supercop_path else None
+        run_codebreaker_mode(
+            encoded_payload=args.payload,
+            device_keys=device_keys,
+            benchmark_crypto=args.crypto_bench,
+            hardware_config_path=None,
+            supercop_path=supercop_path,
+        )
         return
 
     # Start router

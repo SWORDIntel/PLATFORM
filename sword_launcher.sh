@@ -200,6 +200,81 @@ do_selfcode() {
     python3 main.py --self-code --workspace "$workspace"
 }
 
+# Action: Codebreaker (with optional SUPERCOP benchmark)
+do_codebreaker() {
+    print_header "Codebreaker Mode"
+    if [ ! -d "venv" ]; then
+        error "Virtual environment not found. Please run ./scripts/setup.sh first."
+    fi
+    source venv/bin/activate
+
+    local payload devices supercop_path bench_flag="" command_args=()
+
+    payload=$(dialog --stdout --inputbox "Enter base64 payload (leave blank to use bundled sample):" 10 70 "")
+    devices=$(dialog --stdout --inputbox "Target devices (comma-separated, e.g., all or npu,movidius):" 8 70 "all")
+    if dialog --stdout --yesno "Run Simon/Speck SUPERCOP benchmark across the selection?" 7 70; then
+        bench_flag="--crypto-bench"
+    fi
+    supercop_path=$(dialog --stdout --inputbox "Custom SUPERCOP checkout path (optional):" 8 70 "")
+
+    command_args=(python3 main.py --codebreaker)
+    if [ -n "$payload" ]; then
+        command_args+=(--payload "$payload")
+    fi
+    if [ -n "$devices" ]; then
+        command_args+=(--devices "$devices")
+    fi
+    if [ -n "$bench_flag" ]; then
+        command_args+=($bench_flag)
+    fi
+    if [ -n "$supercop_path" ]; then
+        command_args+=(--supercop-path "$supercop_path")
+    fi
+
+    info "Running: ${command_args[*]}"
+    "${command_args[@]}"
+}
+
+# Action: Codebreaker benchmark (SUPERCOP always enabled)
+do_codebreaker_bench() {
+    print_header "Codebreaker Benchmark"
+    if [ ! -d "venv" ]; then
+        error "Virtual environment not found. Please run ./scripts/setup.sh first."
+    fi
+    source venv/bin/activate
+
+    local payload devices supercop_path command_args=()
+
+    payload=$(dialog --stdout --inputbox "Enter base64 payload (leave blank to use bundled sample):" 10 70 "")
+    devices=$(dialog --stdout --inputbox "Target devices (comma-separated, e.g., all or npu,movidius):" 8 70 "all")
+    supercop_path=$(dialog --stdout --inputbox "Custom SUPERCOP checkout path (optional):" 8 70 "")
+
+    command_args=(python3 main.py --codebreaker --crypto-bench)
+    if [ -n "$payload" ]; then
+        command_args+=(--payload "$payload")
+    fi
+    if [ -n "$devices" ]; then
+        command_args+=(--devices "$devices")
+    fi
+    if [ -n "$supercop_path" ]; then
+        command_args+=(--supercop-path "$supercop_path")
+    fi
+
+    info "Running: ${command_args[*]}"
+    "${command_args[@]}"
+}
+
+# Action: Router benchmarks
+do_benchmark() {
+    print_header "Router Benchmark Suite"
+    if [ ! -d "venv" ]; then
+        error "Virtual environment not found. Please run ./scripts/setup.sh first."
+    fi
+    source venv/bin/activate
+    info "Executing benchmark suite..."
+    python3 main.py --benchmark
+}
+
 # Action: Test MCP Servers
 do_test() {
     print_header "Testing MCP Servers and Tools"
@@ -221,10 +296,13 @@ main_menu() {
                     --backtitle "SWORD Launcher | Cursed AI Framework" \
                     --title "Main Menu" \
                     --menu "Select an action:" \
-                    20 70 8 \
+                    22 70 10 \
                     "Run" "Start the SWORD Coder MoE Router" \
+                    "Benchmark" "Run router benchmark suite" \
                     "IDE" "Launch Self-Coding IDE (Textual TUI)" \
                     "SelfCode" "Start Interactive Self-Coding Session" \
+                    "Codebreaker" "Decode payloads + SUPERCOP benchmarking" \
+                    "CB Bench" "Run Codebreaker with SUPERCOP benchmark" \
                     "Download" "Download all required models" \
                     "Quantize" "Run the quantization pipeline" \
                     "Bootstrap" "Build and install the Intel compute stack" \
@@ -273,11 +351,20 @@ while true; do
         "Run")
             do_run
             ;;
+        "Benchmark")
+            do_benchmark
+            ;;
         "IDE")
             do_ide
             ;;
         "SelfCode")
             do_selfcode
+            ;;
+        "Codebreaker")
+            do_codebreaker
+            ;;
+        "CB Bench")
+            do_codebreaker_bench
             ;;
         "Download")
             do_download_models
