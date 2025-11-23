@@ -1070,6 +1070,7 @@ class IDEInterface(App):
         terminal.write("  save         - Save current session")
         terminal.write("  resume ID    - Resume session by ID")
         terminal.write("  codebreaker [PAYLOAD] [devices=a,b] [benchmark] - Decode payload + optimize selection; append 'benchmark' to run SUPERCOP")
+        terminal.write("  codebreaker [PAYLOAD] [devices=a,b] - Decode payload + optimize selection")
         terminal.write("  prompt: TEXT - Direct LLM prompting")
         terminal.write("  llm: TEXT    - Direct LLM prompting (alias)")
         terminal.write("\n╔═══ Coding Tasks ═══╗", style="bold blue")

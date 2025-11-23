@@ -28,9 +28,7 @@ python main.py --codebreaker --payload "<encoded_payload>"
 # enable Simon/Speck SUPERCOP crypto benchmarks across all devices: --crypto-bench
 ```
 
-From the `sword_launcher.sh` TUI menu you can now pick either **Codebreaker** (prompted for SUPERCOP) or **CB Bench** (always runs with SUPERCOP enabled) so both workflows are visible up front.
-
-Inside the IDE TUI, press `F6` or run `codebreaker` in the command box (optionally with `devices=npu,movidius benchmark`) to launch the same analysis with live progress, AI device inventory, SUPERCOP benchmarking, and per-selection optimization. Use `F7` to jump straight into the benchmark-enabled run. The modal now closes with an encryption-type guess, a sentence-likeness flag, and TOPS utilization.
+Inside the IDE TUI, press `F6` or run `codebreaker` in the command box (optionally with `devices=npu,movidius benchmark`) to launch the same analysis with live progress, AI device inventory, SUPERCOP benchmarking, and per-selection optimization. The modal now closes with an encryption-type guess, a sentence-likeness flag, and TOPS utilization.
 
 ## Features
 - 🤖 **Autonomous Coding Agent** - Claude-like self-coding with planning
