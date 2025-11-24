@@ -36,21 +36,69 @@ if [[ -d "venv" ]]; then
   source venv/bin/activate
 
   # Export optimisation flags for Alder Lake (used by all subsequent C/C++ builds)
+<<<<<<< HEAD
   export CFLAGS="-march=alderlake -O2"
   export CXXFLAGS="-march=alderlake -O2 ${CXXFLAGS:-}"
+=======
+  # Only set if not already set to avoid duplication
+  if [[ -z "${CFLAGS:-}" ]]; then
+    export CFLAGS="-march=alderlake -O2"
+  fi
+  if [[ -z "${CXXFLAGS:-}" ]]; then
+    export CXXFLAGS="-march=alderlake -O2"
+  fi
+>>>>>>> 2aeec15739e459f2c549502b8402fc315ab1a1d9
 
-  # Install GCC 13 (required for LLVM 16 source builds)
-  if command -v apt-get > /dev/null; then
-    sudo apt-get update
-    sudo apt-get install -y gcc-13 g++-13 || true
-  elif command -v dnf > /dev/null; then
-    sudo dnf install -y gcc gcc-c++ || true
-  elif command -v pacman > /dev/null; then
-    sudo pacman -Sy --noconfirm gcc || true
+  # Install GCC 13 (preferred for LLVM 16 source builds)
+  echo -e "${YELLOW}Checking for GCC 13...${NC}"
+  if ! command -v gcc-13 > /dev/null; then
+    echo -e "${YELLOW}Installing GCC 13...${NC}"
+    if command -v apt-get > /dev/null; then
+      sudo apt-get update
+      sudo apt-get install -y gcc-13 g++-13 || true
+    elif command -v dnf > /dev/null; then
+      sudo dnf install -y gcc gcc-c++ || true
+    elif command -v pacman > /dev/null; then
+      sudo pacman -Sy --noconfirm gcc || true
+    fi
+  else
+    echo -e "${GREEN}GCC 13 already installed${NC}"
   fi
 else
   echo -e "${RED}Error:${NC} venv directory missing after setup"
   exit 1
+fi
+
+# Pre-flight hardware checks
+echo -e "${YELLOW}Performing hardware checks...${NC}"
+
+# Check for Intel GPU kernel module
+if lsmod 2>/dev/null | grep -q "^i915\|^xe"; then
+  MODULE=$(lsmod | grep "^i915\|^xe" | awk '{print $1}')
+  echo -e "${GREEN}Intel GPU kernel module loaded: ${MODULE}${NC}"
+else
+  echo -e "${YELLOW}Warning: Intel GPU kernel module (i915 or xe) not loaded${NC}"
+  echo -e "${YELLOW}You may need to load it manually or reboot after driver installation${NC}"
+fi
+
+# Detect Intel GPU
+if command -v lspci > /dev/null && lspci 2>/dev/null | grep -qi "intel.*graphics\|intel.*arc"; then
+  GPU_INFO=$(lspci 2>/dev/null | grep -i "intel.*graphics\|intel.*arc" | head -1)
+  echo -e "${GREEN}Intel GPU detected: ${GPU_INFO}${NC}"
+else
+  echo -e "${YELLOW}Warning: Intel GPU not detected${NC}"
+fi
+
+# Check for aria2c (recommended for model downloads)
+if ! command -v aria2c > /dev/null; then
+  echo -e "${YELLOW}aria2c not found. Installing for fast model downloads...${NC}"
+  if command -v apt-get > /dev/null; then
+    sudo apt-get install -y aria2 || true
+  elif command -v dnf > /dev/null; then
+    sudo dnf install -y aria2 || true
+  elif command -v pacman > /dev/null; then
+    sudo pacman -Sy --noconfirm aria2 || true
+  fi
 fi
 
 # 2️⃣ Build Intel compute stack components
