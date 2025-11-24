@@ -2,6 +2,22 @@
 
 AI inference router with autonomous coding capabilities.
 
+## Installation
+
+📦 **First time setup?** See the [Complete Installation Guide](INSTALL.md)
+
+**Quick install:**
+```bash
+# Install all system dependencies
+bash scripts/install_system_deps.sh
+
+# Verify prerequisites
+bash scripts/verify_installation.sh
+
+# Run full bootstrap
+bash bootstrap.sh
+```
+
 ## Quick Start
 
 ### Launch Self-Coding IDE
@@ -39,8 +55,10 @@ Inside the IDE TUI, press `F6` or run `codebreaker` in the command box (optional
 - 🔍 **Codebreaker Mode** - Inspect encoded payloads and list available AI devices
 
 ## Documentation
-- **Self-Coding Guide**: [SELF_CODING.md](SELF_CODING.md)
-- **Full Documentation**: [GEMINI.md](GEMINI.md)
+- **Installation Guide**: [INSTALL.md](INSTALL.md) - Complete setup instructions
+- **Self-Coding Guide**: [SELF_CODING.md](SELF_CODING.md) - Autonomous agent usage
+- **Full Documentation**: [GEMINI.md](GEMINI.md) - Comprehensive platform docs
+- **Agent Architecture**: [AGENTS.md](AGENTS.md) - Multi-agent system design
 
 ---
 
