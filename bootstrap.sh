@@ -37,7 +37,7 @@ if [[ -d "venv" ]]; then
 
   # Export optimisation flags for Alder Lake (used by all subsequent C/C++ builds)
   export CFLAGS="-march=alderlake -O2"
-  export CXXFLAGS="-march=alderlake -O2 $CXXFLAGS"
+  export CXXFLAGS="-march=alderlake -O2 ${CXXFLAGS:-}"
 
   # Install GCC 13 (required for LLVM 16 source builds)
   if command -v apt-get > /dev/null; then
