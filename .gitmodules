@@ -1,3 +1,9 @@
 [submodule "NUC2.1"]
 	path = NUC2.1
 	url = https://github.com/SWORDIntel/NUC2.1
+[submodule "external/simon-speck-supercop"]
+	path = external/simon-speck-supercop
+	url = https://github.com/nsacyber/simon-speck-supercop
+[submodule "external/simon-speck"]
+	path = external/simon-speck
+	url = https://github.com/nsacyber/simon-speck
